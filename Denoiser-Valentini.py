@@ -29,7 +29,7 @@ device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 print("Device:", device)
 
 # Global Hyperparameters
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 SAMPLE_RATE = 16000
 NUM_EPOCHS = 400         # Number of training epochs.
 LEARNING_RATE = 3e-4      # Learning rate.
@@ -281,7 +281,7 @@ if os.path.exists(best_model_path):
 
 for epoch in range(NUM_EPOCHS):
     print(f"Epoch {epoch+1}/{NUM_EPOCHS}")
-    train_loss, train_l1, global_step = train_one_epoch(model, train_loader, optimizer, scheduler, criterion, device, writer, global_step)
+    train_loss, train_l1, global_step = train_one_epoch(model, train_loader, optimizer, scheduler, criterion, device, writer, global_step, LOAD_AUGS=True)
     val_loss, val_l1 = validate_one_epoch(model, val_loader, criterion, device)
     train_losses.append(train_loss)
     val_losses.append(val_loss)

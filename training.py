@@ -3,13 +3,33 @@ from losses import time_domain_l1
 import torch
 import torch.nn as nn
 
+SAMPLE_RATE = 16000
+
 def external_normalize(audio, eps=1e-3):
     mono = audio.mean(dim=1, keepdim=True)
     std = mono.std(dim=-1, keepdim=True)
     normalized = audio / (std + eps)
     return normalized, std
 
-def train_one_epoch(model, dataloader, optimizer, scheduler, criterion, device, writer, global_step):
+def train_one_epoch(model, dataloader, optimizer, scheduler, criterion, device, writer, global_step, LOAD_AUGS=False):
+    try:
+        if LOAD_AUGS:
+            from augmentation import Remix, RevEcho, BandMask, Shift
+            augmentations = nn.Sequential(
+                Remix(),
+                BandMask(maxwidth=0.2, bands=120, sample_rate=SAMPLE_RATE),
+                Shift(same=True),
+                RevEcho(proba=0.5, initial=0.3, rt60=(0.3, 1.3),
+                        first_delay=(0.01, 0.03), repeat=3, jitter=0.1,
+                        keep_clean=0.1, sample_rate=SAMPLE_RATE)
+            )
+            print("Augmentations loaded.")
+        else:
+            augmentations = None
+            print("Augmentations not loaded.")
+    except ImportError:
+        augmentations = None
+        print("Augmentation modules not found; proceeding without augmentations.")
     model.train()
     running_loss = 0.0
     running_l1 = 0.0
@@ -17,14 +37,12 @@ def train_one_epoch(model, dataloader, optimizer, scheduler, criterion, device, 
     for i, (noisy, clean) in progress_bar:
         noisy = noisy.to(device)
         clean = clean.to(device)
-        # (Optional) Apply augmentations if available.
-        # For example, if you wish to include your augmentation modules, uncomment and adjust the following:
-        # if augmentations is not None:
-        #     noise = noisy - clean
-        #     sources = torch.stack([noise, clean])
-        #     sources = augmentations(sources)
-        #     noise, clean = sources[0], sources[1]
-        #     noisy = noise + clean
+        if augmentations is not None:
+            noise = noisy - clean
+            sources = torch.stack([noise, clean])
+            sources = augmentations(sources)
+            noise, clean = sources[0], sources[1]
+            noisy = noise + clean
 
         normalized_noisy, std = external_normalize(noisy)
         optimizer.zero_grad()

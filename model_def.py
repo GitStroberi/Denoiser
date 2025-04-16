@@ -150,7 +150,6 @@ class CausalDemucsSplit(nn.Module):
             mono = x.mean(dim=1, keepdim=True)
             std = mono.std(dim=-1, keepdim=True)
             x = x / (std + self.floor)
-        # Upsample if needed.
         if self.resample == 2:
             x = upsample2(x)
         elif self.resample == 4:
@@ -180,12 +179,12 @@ class CausalDemucsSplit(nn.Module):
         skips = skip_list.copy()  # copy to avoid modifying the original list
         for dec in self.decoder:
             if skips:
-                # Pop the last skip; for the first decoder layer, this is the final encoder output.
                 skip = skips.pop()
-                if skip.shape[-1] > x.shape[-1]:
-                    skip = skip[..., :x.shape[-1]]
+                assert skip.shape[-1] == x.shape[-1], "Mismatch in feature lengths between skip and decoder."
                 x = x + skip
-            x = dec(x)
+                x = dec(x)
+            else:
+                raise ValueError("Not enough skip connections for decoding.")
         if self.resample == 2:
             x = downsample2(x)
         elif self.resample == 4:

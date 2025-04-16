@@ -253,7 +253,7 @@ best_model_path = "best_model_ms_snsd.pth"
 
 for epoch in range(NUM_EPOCHS):
     print(f"Epoch {epoch+1}/{NUM_EPOCHS}")
-    train_loss, train_l1, global_step = train_one_epoch(model, train_loader, optimizer, scheduler, criterion, device, writer, global_step)
+    train_loss, train_l1, global_step = train_one_epoch(model, train_loader, optimizer, scheduler, criterion, device, writer, global_step, LOAD_AUGS=False)
     val_loss, val_l1 = validate_one_epoch(model, val_loader, criterion, device)
     train_losses.append(train_loss)
     val_losses.append(val_loss)
