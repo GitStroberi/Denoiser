@@ -54,7 +54,7 @@ device = torch.device("cpu")
 model = CausalDemucsSplit(chin=1, chout=1, hidden=48, depth=5, kernel_size=8,
                           stride=4, causal=True, resample=4, normalize=False, glu=True).to(device)
 # Adjust the following path as needed.
-checkpoint_path = "best_model_ms_snsd.pth"
+checkpoint_path = "best_model_ms_snsd_split.pth"
 assert os.path.exists(checkpoint_path), f"Checkpoint {checkpoint_path} not found!"
 model.load_state_dict(torch.load(checkpoint_path, map_location=device))
 model.eval()
