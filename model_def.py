@@ -227,3 +227,112 @@ class DemucsDecoderONNX(nn.Module):
         latent_out = inputs[0]
         skip_list = list(inputs[1:])
         return self.model.decode(latent_out, skip_list, FRAME_LENGTH)
+    
+import torch
+import torch.nn as nn
+
+class CustomLSTM(nn.Module):
+    """
+    A drop-in replacement for nn.LSTM that matches PyTorch's interface and parameter names.
+    Supports num_layers, bias, batch_first, and unidirectional LSTM.
+    Parameters can be directly copied from a trained nn.LSTM module.
+    """
+    def __init__(self, input_size, hidden_size, num_layers=1, bias=True,
+                 batch_first=False, bidirectional=False):
+        super().__init__()
+        assert not bidirectional, "Bidirectional LSTM not supported in this custom implementation."
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
+        self.batch_first = batch_first
+        self.bidirectional = bidirectional
+        
+        # Create parameters for each layer
+        for layer in range(num_layers):
+            layer_input_size = input_size if layer == 0 else hidden_size
+            # input-hidden weights and biases
+            w_ih = nn.Parameter(torch.Tensor(4 * hidden_size, layer_input_size))
+            w_hh = nn.Parameter(torch.Tensor(4 * hidden_size, hidden_size))
+            self.register_parameter(f'weight_ih_l{layer}', w_ih)
+            self.register_parameter(f'weight_hh_l{layer}', w_hh)
+            if bias:
+                b_ih = nn.Parameter(torch.Tensor(4 * hidden_size))
+                b_hh = nn.Parameter(torch.Tensor(4 * hidden_size))
+                self.register_parameter(f'bias_ih_l{layer}', b_ih)
+                self.register_parameter(f'bias_hh_l{layer}', b_hh)
+        
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # Initialize weights and biases similar to PyTorch default
+        stdv = 1.0 / (self.hidden_size ** 0.5)
+        for name, param in self.named_parameters():
+            if 'weight' in name:
+                nn.init.uniform_(param, -stdv, stdv)
+            elif 'bias' in name:
+                nn.init.zeros_(param)
+
+    def forward(self, x, hx=None):
+        """
+        x: input sequence, shape (seq_len, batch, input_size) or (batch, seq_len, input_size) if batch_first.
+        hx: (h0, c0), each of shape (num_layers, batch, hidden_size). Defaults to zeros.
+        Returns:
+            output: full output sequence, same shape as input with hidden_size features
+            (hn, cn): final hidden and cell states
+        """
+        if self.batch_first:
+            # convert to (seq, batch, feature)
+            x = x.transpose(0, 1)
+        seq_len, batch_size, _ = x.size()
+
+        if hx is None:
+            h_t = x.new_zeros(self.num_layers, batch_size, self.hidden_size)
+            c_t = x.new_zeros(self.num_layers, batch_size, self.hidden_size)
+        else:
+            h_t, c_t = hx
+
+        outputs = []
+        # iterate timesteps
+        for t in range(seq_len):
+            input_t = x[t]
+            h_t, c_t = self._forward_step(input_t, (h_t, c_t))
+            outputs.append(h_t[-1])  # top layer hidden
+        output = torch.stack(outputs, dim=0)
+
+        if self.batch_first:
+            output = output.transpose(0, 1)
+        return output, (h_t, c_t)
+
+    def _forward_step(self, input_t, states):
+        h_prev, c_prev = states
+        h_next = []
+        c_next = []
+        layer_input = input_t
+
+        # process each layer
+        for layer in range(self.num_layers):
+            w_ih = getattr(self, f'weight_ih_l{layer}')
+            w_hh = getattr(self, f'weight_hh_l{layer}')
+            b_ih = getattr(self, f'bias_ih_l{layer}') if self.bias else 0
+            b_hh = getattr(self, f'bias_hh_l{layer}') if self.bias else 0
+
+            # gates: input, forget, cell, output
+            gates = (layer_input @ w_ih.t()) + b_ih + (h_prev[layer] @ w_hh.t()) + b_hh
+            i, f, g, o = gates.chunk(4, dim=1)
+            i = torch.sigmoid(i)
+            f = torch.sigmoid(f)
+            g = torch.tanh(g)
+            o = torch.sigmoid(o)
+
+            c_l = f * c_prev[layer] + i * g
+            h_l = o * torch.tanh(c_l)
+
+            h_next.append(h_l)
+            c_next.append(c_l)
+            # next layer input is current hidden state
+            layer_input = h_l
+
+        h_next = torch.stack(h_next, dim=0)
+        c_next = torch.stack(c_next, dim=0)
+        return h_next, c_next
