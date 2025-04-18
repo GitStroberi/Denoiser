@@ -237,7 +237,7 @@ writer = SummaryWriter(log_dir)
 global_step = 0
 
 # --- Load pretrained model before continuing training ---
-pretrained_model_path = "/home/afilip/project/best_model.pth"  # <-- Update this path!
+pretrained_model_path = "/home/afilip/testing/best_model_split.pth"  # <-- Update this path!
 if os.path.exists(pretrained_model_path):
     model.load_state_dict(torch.load(pretrained_model_path))
     print("Loaded pretrained model for continued training.")
@@ -249,7 +249,7 @@ val_losses = []
 train_l1_losses = []
 val_l1_losses = []
 best_val_loss = float("inf")
-best_model_path = "best_model_ms_snsd.pth"
+best_model_path = "best_model_ms_snsd_split.pth"
 
 for epoch in range(NUM_EPOCHS):
     print(f"Epoch {epoch+1}/{NUM_EPOCHS}")

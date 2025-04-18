@@ -149,27 +149,6 @@ print("Validation samples:", len(val_subset))
 print("Testing samples:", len(test_dataset))
 
 # %%
-# (Optional) Load augmentation modules (applied during training only)
-LOAD_AUGS = True
-try:
-    if LOAD_AUGS:
-        from augmentation import Remix, RevEcho, BandMask, Shift
-        augmentations = nn.Sequential(
-            Remix(),
-            BandMask(maxwidth=0.2, bands=120, sample_rate=SAMPLE_RATE),
-            Shift(same=True),
-            RevEcho(proba=0.5, initial=0.3, rt60=(0.3, 1.3),
-                    first_delay=(0.01, 0.03), repeat=3, jitter=0.1,
-                    keep_clean=0.1, sample_rate=SAMPLE_RATE)
-        )
-    else:
-        augmentations = None
-        print("Augmentations not loaded.")
-except ImportError:
-    augmentations = None
-    print("Augmentation modules not found; proceeding without augmentations.")
-
-# %%
 # -----------------------------------------------------------------------------------
 # 3. MODEL DEFINITION: ONNX-Compatible CausalDemucs (Split into Encoder, LSTM, Decoder)
 # -----------------------------------------------------------------------------------
