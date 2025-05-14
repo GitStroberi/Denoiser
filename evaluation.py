@@ -40,7 +40,7 @@ CLEAN_TEST_DIR = r"C:\Users\Andrei\Desktop\Proiect Licenta\datasets\DS_10283_279
 ##################################
 # MODEL DEFINITION: CausalDemucs
 ##################################
-from model_def import CausalDemucsSplit
+from model_def_gru import CausalDemucsSplit
 
 ##################################
 # LOAD THE MODEL (best_model_ms_snsd.pth)
@@ -48,7 +48,7 @@ from model_def import CausalDemucsSplit
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = CausalDemucsSplit(chin=1, chout=1, hidden=48, depth=5, kernel_size=K, stride=S_conv,
                      causal=True, resample=RESAMPLE_FACTOR, normalize=False, glu=True).to(device)
-checkpoint = torch.load("best_model_split_no_aug.pth", map_location=device)
+checkpoint = torch.load("best_model_ms_snsd_gru.pth", map_location=device)
 model.load_state_dict(checkpoint)
 model.eval()
 print("Model loaded for evaluation.")
